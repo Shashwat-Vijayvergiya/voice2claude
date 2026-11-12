@@ -109,6 +109,7 @@ def test_control_module_is_stdlib_only():
         elif isinstance(node, ast.ImportFrom) and node.module:
             names.add(node.module.split(".")[0])
     names.discard("__future__")
+    names.discard("app")  # only app.companion, itself checked as stdlib-only in test_companion
     assert names <= set(sys.stdlib_module_names), names - set(sys.stdlib_module_names)
 
 

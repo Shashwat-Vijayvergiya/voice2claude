@@ -172,13 +172,32 @@ def _launch_app(extra_args: list[str]) -> None:
 
 USAGE = """usage: voice2claude <command>
 
-  toggle   start or stop recording (starts the app if it isn't running)
-  show     bring the window forward (starts the app if it isn't running)
-  status   say whether the app is running
+  toggle               start or stop recording (starts the app if it isn't running)
+  show                 bring the window forward (starts the app if it isn't running)
+  status               say whether the app is running
+
+  companion install    open Voice to Claude whenever Claude desktop starts
+  companion uninstall  stop doing that
+  companion status     show whether it's set up
+  watch-claude         (used by the companion service) watch for Claude desktop
 """
 
 
 def main(argv: list[str]) -> int:
+    if argv[:1] == ["companion"] and len(argv) == 2 and argv[1] in ("install", "uninstall", "status"):
+        from app import companion
+
+        try:
+            print(getattr(companion, argv[1])())
+        except (RuntimeError, OSError) as exc:
+            sys.stderr.write(f"voice2claude: {exc}\n")
+            return 1
+        return 0
+    if argv == ["watch-claude"]:
+        from app import companion
+
+        companion.watch(lambda: main(["show"]))
+        return 0
     if len(argv) != 1 or argv[0] not in ("toggle", "show", "status"):
         sys.stderr.write(USAGE)
         return 2

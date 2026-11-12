@@ -8,7 +8,7 @@
 | 4. Context and history | ✅ Built (2026-11-12); 15/16 real-API eval samples pass, incl. follow-ups |
 | 5. Clipboard and polish | ✅ Done (2026-11-12); fresh install verified on Python 3.14 |
 
-Tests: 229 passing (`QT_QPA_PLATFORM=offscreen .venv/bin/pytest`). All Groq calls are mocked.
+Tests: 239 passing (`QT_QPA_PLATFORM=offscreen .venv/bin/pytest`). All Groq calls are mocked.
 Real-API eval: `.venv/bin/python tests/eval_compression.py` (16 samples, uses quota).
 
 ## Phase 1: Foundation
@@ -127,6 +127,12 @@ Bugs found and fixed in Phase 5:
 - Light theme stayed dark: Fusion's "standard" palette follows the desktop's dark mode → explicit light palette.
 - Ctrl+Enter in a text box inserted a newline instead of copying.
 - **Fresh-install test exposed:** a socket path over the Unix limit left the app without its control socket, and then every `voice2claude toggle` launched *another* app (three recorded at once). Fixed with the path stand-in and the instance lock; re-tested the same scenario.
+
+## After v1: open with Claude desktop
+
+- `app/companion.py` (stdlib only): watches `/proc` for a `claude-desktop` process every 2 s and, when Claude starts, runs `voice2claude show` (opens the app or brings it forward). Reacts only to Claude starting, so closing the app doesn't make it reopen.
+- `voice2claude companion install | uninstall | status` manages a systemd user service bound to `graphical-session.target` (`Restart=on-failure`, `KillMode=process` so restarting the watcher never closes the app). Chosen over editing Claude's `.desktop` file, which Claude's updater can overwrite and which doesn't cover other ways of starting Claude.
+- Installing it is a step the user runs (Claude Code's safety check blocks creating login-time services on the user's behalf).
 
 ## v1 status
 

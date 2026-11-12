@@ -134,6 +134,22 @@ Avoid **Super+Space**: GNOME uses it to switch keyboard layouts/input sources.
 On Wayland, apps can't force themselves to the front, so when a transcript is ready
 the window may only flash in the dock. Click it to review.
 
+## Open with Claude desktop
+
+Make Voice to Claude open every time Claude desktop starts:
+
+```bash
+./voice2claude companion install     # set up (takes effect now and at every login)
+./voice2claude companion status      # check it
+./voice2claude companion uninstall   # undo
+```
+
+This installs a small systemd user service (`~/.config/systemd/user/voice-to-claude-companion.service`)
+that checks every 2 s whether `claude-desktop` is running. When Claude *starts*, it opens Voice to
+Claude (or brings it forward). It works however Claude is launched and survives Claude updates. Closing
+Voice to Claude while Claude is open won't make it reopen; it comes back the next time Claude starts.
+Logs: `journalctl --user -u voice-to-claude-companion`.
+
 ## Theme
 
 **View → Theme**: System (follows your desktop's dark mode, live), Light or Dark. Saved in your settings.
