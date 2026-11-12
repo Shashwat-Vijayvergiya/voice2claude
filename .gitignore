@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.log
+.env
+history.jsonl
+*.tmp
+*.sock
+*.lock

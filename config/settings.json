@@ -1,0 +1,16 @@
+{
+  "whisper_model": "whisper-large-v3-turbo",
+  "llm_model": "openai/gpt-oss-120b",
+  "audio_device": null,
+  "silence_seconds": 2.0,
+  "no_speech_timeout_seconds": 8.0,
+  "max_record_seconds": 180,
+  "language": "auto",
+  "compression_strength": "balanced",
+  "llm_reasoning_effort": "low",
+  "skip_under_words": 30,
+  "compression_timeout_seconds": 20.0,
+  "current_project": "default",
+  "theme": "system",
+  "history_enabled": true
+}

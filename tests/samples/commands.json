@@ -1,0 +1,269 @@
+{
+  "_about": "Typed stand-ins for spoken commands. Replace/extend with your own recordings' transcripts. must_keep: case-insensitive regexes that must match the output. must_not: regexes that must NOT match (invented content). context: optional {project_notes, recent_commands} sent as background, as the app does.",
+  "samples": [
+    {
+      "id": "refactor-constraints",
+      "transcript": "Um so basically I want you to refactor the parse_config function in utils dot py, and like, don't change the public API because other modules use it. Use Python 3.12, set the timeout to thirty seconds and retries to 3. Never touch src/legacy/old_api.py. And after that run pytest and make sure everything passes.",
+      "mode": "COMMAND",
+      "must_keep": [
+        "parse_config",
+        "utils\\.py",
+        "(do not|don't|never|without)[^\\n]*(public api)|public api[^\\n]*(unchanged)",
+        "3\\.12",
+        "\\b30\\b|thirty",
+        "\\b3\\b|three",
+        "(do not|don't|never)[^\\n]*src/legacy/old_api\\.py",
+        "pytest"
+      ],
+      "destructive": false
+    },
+    {
+      "id": "debug-multistep",
+      "transcript": "Okay so the login is broken again. When I submit the form on slash login I get a 500 error and the logs say KeyError session_id in auth slash middleware dot py around line 42. First figure out why session_id is missing, then fix it, then add a regression test in tests slash test_auth dot py. Don't modify the database schema.",
+      "mode": "COMMAND",
+      "must_keep": [
+        "500",
+        "KeyError",
+        "session_id",
+        "middleware\\.py",
+        "\\b42\\b",
+        "test_auth\\.py",
+        "(do not|don't|never|without)[^\\n]*(database schema|schema)"
+      ],
+      "destructive": false
+    },
+    {
+      "id": "question",
+      "transcript": "Hmm so I was wondering, like, what's actually the difference between using asyncio dot gather and asyncio dot TaskGroup in Python 3.11, and is one of them better for handling errors when one of the tasks fails? I don't need code, just explain it.",
+      "mode": "QUESTION",
+      "must_keep": [
+        "gather",
+        "TaskGroup",
+        "3\\.11",
+        "error|fail",
+        "(no|without|don't|do not)[^\\n]*code|explanation only|explain"
+      ],
+      "must_not": [
+        "^TASK:"
+      ],
+      "destructive": false
+    },
+    {
+      "id": "only-restriction",
+      "transcript": "Can you update the README so it explains how to install the app on Ubuntu with the venv, but only change the installation section, leave everything else exactly as it is, and keep it under 200 words. Also mention that libportaudio2 is required.",
+      "mode": "COMMAND",
+      "must_keep": [
+        "README",
+        "Ubuntu",
+        "only[^\\n]*installation|installation[^\\n]*only|other than the installation|(do not|don't)[^\\n]*other sections",
+        "200",
+        "libportaudio2"
+      ],
+      "destructive": false
+    },
+    {
+      "id": "destructive",
+      "transcript": "Alright, the old migrations folder is a mess. Delete all the files in migrations slash old, drop the temp_users table from the dev database, and then reset the alembic history so it starts fresh from the current models. Don't touch the production database at all, only dev.",
+      "mode": "COMMAND",
+      "must_keep": [
+        "migrations/old",
+        "temp_users",
+        "drop",
+        "delete",
+        "reset",
+        "alembic",
+        "(do not|don't|never|without)[^\\n]*production",
+        "only[^\\n]*dev|dev[^\\n]*only"
+      ],
+      "destructive": true
+    },
+    {
+      "id": "ambiguous",
+      "transcript": "So the thing is the function is too slow, it takes like forever when there are a lot of users. Make it faster somehow, maybe add caching or something, I'm not sure, whatever works best, but it has to stay compatible with the current callers and don't add any new dependencies.",
+      "mode": "COMMAND",
+      "must_keep": [
+        "(slow|faster|performance|speed)",
+        "(compatib|callers)",
+        "(do not|don't|no|never|without)[^\\n]*(new )?dependenc"
+      ],
+      "expect_ambiguity": true,
+      "destructive": false
+    },
+    {
+      "id": "hinglish",
+      "transcript": "Achha so basically mujhe ek function chahiye jo CSV file read kare, data dot csv, aur uske andar jo email column hai usko validate kare. Invalid emails ko alag file mein likhna hai, invalid_emails dot csv. Pandas use mat karna, sirf standard library.",
+      "mode": "COMMAND",
+      "must_keep": [
+        "data\\.csv",
+        "email",
+        "invalid_emails\\.csv",
+        "(do not|don't|never|without|no)[^\\n]*pandas|pandas[^\\n]*(not|no)",
+        "standard library|stdlib|csv module"
+      ],
+      "destructive": false
+    },
+    {
+      "id": "dictation",
+      "transcript": "Hi team, um, quick update on the voice project. The transcription part is working now and latency is around half a second. Next week I'll start on the compression layer, uh, and I'll share a demo on Friday. Thanks!",
+      "mode": "DICTATION",
+      "must_keep": [
+        "Hi team",
+        "half a second",
+        "Friday",
+        "compression layer"
+      ],
+      "must_not": [
+        "^TASK:",
+        "\\bum\\b",
+        "\\buh\\b"
+      ],
+      "destructive": false
+    },
+    {
+      "id": "code",
+      "transcript": "Write a shell command that finds all python files under src modified in the last 7 days, excluding anything in the tests folder, and prints their line counts sorted from largest to smallest. Use find and wc, not any extra tools.",
+      "mode": "COMMAND",
+      "must_not": [
+        "-exec",
+        "\\| *sort",
+        "-mtime"
+      ],
+      "must_keep": [
+        "src",
+        "\\b7\\b|seven",
+        "(exclud|not|without)[^\\n]*tests|tests[^\\n]*exclud",
+        "find",
+        "wc",
+        "(sort|largest)"
+      ],
+      "destructive": false
+    },
+    {
+      "id": "self-correction",
+      "transcript": "Add a retry decorator to the fetch_data function with five retries, no wait, make it three retries, with exponential backoff starting at 1 second. Put it in network slash retry dot py and use it in client dot py. Don't use the tenacity library.",
+      "mode": "COMMAND",
+      "must_keep": [
+        "fetch_data",
+        "\\b3\\b|three",
+        "exponential",
+        "\\b1\\b|one",
+        "retry\\.py",
+        "client\\.py",
+        "(do not|don't|never|without|no)[^\\n]*tenacity"
+      ],
+      "must_not": [
+        "\\b5\\b|five"
+      ],
+      "destructive": false
+    },
+    {
+      "id": "short-skip",
+      "transcript": "Um, fix the typo in the README title.",
+      "mode": null,
+      "must_keep": [
+        "typo",
+        "README"
+      ],
+      "expect_skipped": true,
+      "destructive": false
+    },
+    {
+      "id": "no-invention",
+      "transcript": "So I want a new endpoint, GET slash api slash health, that just returns status ok and the app version from the VERSION file. Nothing else, no database check, no auth on this one. It's a FastAPI app. Add one test for it.",
+      "mode": "COMMAND",
+      "must_keep": [
+        "/api/health",
+        "status|ok",
+        "VERSION",
+        "(no|without|do not|don't)[^\\n]*database",
+        "(no|without|do not|don't)[^\\n]*auth",
+        "FastAPI",
+        "test"
+      ],
+      "must_not": [
+        "rate limit",
+        "logging",
+        "docker",
+        "uptime"
+      ],
+      "destructive": false
+    },
+    {
+      "id": "followup-auth",
+      "transcript": "Okay now add authentication to it after all, use the existing API key header check.",
+      "context": {
+        "recent_commands": [
+          "TASK: Add a GET /api/health endpoint to the FastAPI app that returns status ok and the app version from the VERSION file.\nCONSTRAINTS:\n- No database check\n- No authentication"
+        ]
+      },
+      "mode": "COMMAND",
+      "must_keep": [
+        "auth",
+        "/api/health|health",
+        "API key"
+      ],
+      "must_not": [
+        "^- *no authentication *$",
+        "^- *do not (add|require) authentication"
+      ],
+      "destructive": false
+    },
+    {
+      "id": "followup-same",
+      "transcript": "also do the same for the login form",
+      "context": {
+        "recent_commands": [
+          "TASK: Add input validation to the signup form in SignupForm.tsx\nREQUIREMENTS:\n- Email must be valid\n- Password at least 8 characters"
+        ]
+      },
+      "mode": "COMMAND",
+      "must_keep": [
+        "login",
+        "valid"
+      ],
+      "destructive": false
+    },
+    {
+      "id": "notes-no-override",
+      "transcript": "So for the CSV importer module, um, write the tests with unittest this time, not pytest, because this module runs in a separate locked-down environment where pytest isn't installed, and cover the empty file case and the bad header case.",
+      "context": {
+        "project_notes": "Goal: internal data tool.\nStack: Python 3.12, FastAPI, PostgreSQL.\nTests: pytest."
+      },
+      "mode": "COMMAND",
+      "must_keep": [
+        "unittest",
+        "(not|do not|don't|never|without|instead of)[^\\n]*pytest",
+        "CSV",
+        "empty",
+        "header",
+        "not installed|isn't installed|unavailable|not available"
+      ],
+      "must_not": [
+        "PostgreSQL",
+        "FastAPI"
+      ],
+      "destructive": false
+    },
+    {
+      "id": "notes-not-injected",
+      "transcript": "Okay so add a section to the README explaining how to set up the development environment on macOS, like installing Python with Homebrew and then creating the virtual environment and installing the requirements, and keep it short, a few lines is enough.",
+      "context": {
+        "project_notes": "Goal: internal data tool.\nStack: Python 3.12, FastAPI, PostgreSQL.\nTests: pytest."
+      },
+      "mode": "COMMAND",
+      "must_keep": [
+        "README",
+        "macOS",
+        "virtual environment|venv",
+        "short",
+        "Homebrew"
+      ],
+      "must_not": [
+        "PostgreSQL",
+        "FastAPI",
+        "pytest"
+      ],
+      "destructive": false
+    }
+  ]
+}

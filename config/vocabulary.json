@@ -1,0 +1,7 @@
+{
+  "terms": [
+    "Claude", "Claude Code", "Python", "pytest", "PySide6", "pydantic",
+    "FastAPI", "Django", "React", "TypeScript", "JSON", "JSONL", "API",
+    "Groq", "Whisper", "Ubuntu", "Wayland", "git", "README", "SQLite"
+  ]
+}
