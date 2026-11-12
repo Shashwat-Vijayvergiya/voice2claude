@@ -15,6 +15,8 @@ log = logging.getLogger(__name__)
 
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 MAX_PROMPT_CHARS = 600  # Whisper reads at most ~224 prompt tokens
+# Commands are spoken to Claude; saying so stops "Hey Claude" being heard as "Hey Cloud".
+WHISPER_PREFIX = "Hey Claude, here is an instruction for Claude, the AI coding assistant. "
 
 _LANGUAGE_ALIASES = {"english": "en", "hindi": "hi"}
 
@@ -30,7 +32,7 @@ class TranscriptionError(Exception):
 def build_vocabulary_prompt(terms: list[str]) -> str | None:
     """Comma list of technical terms so Whisper spells them right."""
     picked: list[str] = []
-    length = len("Technical terms: .")
+    length = len(WHISPER_PREFIX) + len("Technical terms: .")
     for term in terms:
         term = term.strip()
         if not term or term in picked:
@@ -39,7 +41,7 @@ def build_vocabulary_prompt(terms: list[str]) -> str | None:
             break
         picked.append(term)
         length += len(term) + 2
-    return f"Technical terms: {', '.join(picked)}." if picked else None
+    return f"{WHISPER_PREFIX}Technical terms: {', '.join(picked)}." if picked else WHISPER_PREFIX.strip()
 
 
 def normalize_language(language: str | None) -> str | None:

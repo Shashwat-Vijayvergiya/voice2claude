@@ -123,3 +123,77 @@ def status(run: Callable[..., subprocess.CompletedProcess] = _systemctl) -> str:
         enabled = "not installed"
     active = run("is-active", SERVICE).stdout.strip() or "inactive"
     return f"companion: {enabled}, {active}; Claude desktop {'running' if claude_running() else 'not running'}"
+
+
+# ---- GNOME keyboard shortcut ----------------------------------------------------------
+
+MEDIA_KEYS = "org.gnome.settings-daemon.plugins.media-keys"
+CUSTOM_SCHEMA = MEDIA_KEYS + ".custom-keybinding"
+CUSTOM_BASE = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/"
+SHORTCUT_NAME = "Voice to Claude"
+DEFAULT_BINDING = "<Control><Alt>space"
+
+
+def _gsettings(*args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["gsettings", *args], capture_output=True, text=True, timeout=10)
+
+
+def _parse_list(text: str) -> list[str]:
+    text = text.strip()
+    if text.startswith("@as"):
+        text = text[3:].strip()
+    return [p.strip().strip("'\"") for p in text.strip("[]").split(",") if p.strip().strip("'\"")]
+
+
+def _format_list(paths: list[str]) -> str:
+    return "[" + ", ".join(f"'{p}'" for p in paths) + "]"
+
+
+def _get(run, path: str, key: str) -> str:
+    return run("get", f"{CUSTOM_SCHEMA}:{path}", key).stdout.strip().strip("'")
+
+
+def find_shortcut(run=_gsettings) -> str | None:
+    for path in _parse_list(run("get", MEDIA_KEYS, "custom-keybindings").stdout):
+        if _get(run, path, "name") == SHORTCUT_NAME or "voice2claude" in _get(run, path, "command"):
+            return path
+    return None
+
+
+def shortcut_install(binding: str = DEFAULT_BINDING, run=_gsettings) -> str:
+    """Add (or update) a GNOME custom shortcut that runs `voice2claude toggle`, keeping all others."""
+    paths = _parse_list(run("get", MEDIA_KEYS, "custom-keybindings").stdout)
+    path = find_shortcut(run)
+    if path is None:
+        n = 0
+        while f"{CUSTOM_BASE}custom{n}/" in paths:
+            n += 1
+        path = f"{CUSTOM_BASE}custom{n}/"
+        paths.append(path)
+    for args in (
+        ("set", MEDIA_KEYS, "custom-keybindings", _format_list(paths)),
+        ("set", f"{CUSTOM_SCHEMA}:{path}", "name", SHORTCUT_NAME),
+        ("set", f"{CUSTOM_SCHEMA}:{path}", "command", f"{CLI} toggle"),
+        ("set", f"{CUSTOM_SCHEMA}:{path}", "binding", binding),
+    ):
+        result = run(*args)
+        if result.returncode != 0:
+            raise RuntimeError(f"gsettings {' '.join(args[:3])} failed: {result.stderr.strip()}")
+    return f"Shortcut set: {binding.replace('<Control>', 'Ctrl+').replace('<Alt>', 'Alt+').replace('<Super>', 'Super+')} runs '{CLI} toggle'."
+
+
+def shortcut_uninstall(run=_gsettings) -> str:
+    path = find_shortcut(run)
+    if path is None:
+        return "No Voice to Claude shortcut found."
+    paths = [p for p in _parse_list(run("get", MEDIA_KEYS, "custom-keybindings").stdout) if p != path]
+    run("set", MEDIA_KEYS, "custom-keybindings", _format_list(paths))
+    run("reset-recursively", f"{CUSTOM_SCHEMA}:{path}")
+    return "Shortcut removed."
+
+
+def shortcut_status(run=_gsettings) -> str:
+    path = find_shortcut(run)
+    if path is None:
+        return "shortcut: not set"
+    return f"shortcut: {_get(run, path, 'binding')} -> {_get(run, path, 'command')}"

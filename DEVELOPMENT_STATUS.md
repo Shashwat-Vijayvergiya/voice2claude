@@ -8,7 +8,7 @@
 | 4. Context and history | ✅ Built (2026-11-12); 15/16 real-API eval samples pass, incl. follow-ups |
 | 5. Clipboard and polish | ✅ Done (2026-11-12); fresh install verified on Python 3.14 |
 
-Tests: 239 passing (`QT_QPA_PLATFORM=offscreen .venv/bin/pytest`). All Groq calls are mocked.
+Tests: 258 passing (`QT_QPA_PLATFORM=offscreen .venv/bin/pytest`). All Groq calls are mocked.
 Real-API eval: `.venv/bin/python tests/eval_compression.py` (16 samples, uses quota).
 
 ## Phase 1: Foundation
@@ -133,6 +133,17 @@ Bugs found and fixed in Phase 5:
 - `app/companion.py` (stdlib only): watches `/proc` for a `claude-desktop` process every 2 s and, when Claude starts, runs `voice2claude show` (opens the app or brings it forward). Reacts only to Claude starting, so closing the app doesn't make it reopen.
 - `voice2claude companion install | uninstall | status` manages a systemd user service bound to `graphical-session.target` (`Restart=on-failure`, `KillMode=process` so restarting the watcher never closes the app). Chosen over editing Claude's `.desktop` file, which Claude's updater can overwrite and which doesn't cover other ways of starting Claude.
 - Installing it is a step the user runs (Claude Code's safety check blocks creating login-time services on the user's behalf).
+
+## After v1: Insert instead of Copy
+
+Requested by voice (the request itself was dictated through the app).
+- `app/inserter.py`: `PortalPaster` uses the xdg-desktop-portal RemoteDesktop API through `jeepney` (pure-Python D-Bus, already a keyring dependency; now listed in requirements): CreateSession → SelectDevices (keyboard, `persist_mode=2` with a saved restore token) → Start (GNOME asks once) → Ctrl+V keysyms → Close. Never sends Return.
+- Chosen over `ydotool` (needs root access to `/dev/uinput` and lets any process type anywhere), `wtype` (GNOME has no virtual-keyboard protocol) and `xdotool` (X11 only; Claude runs as a native Wayland window).
+- `Session.insert`: clipboard first (so the text is always one Ctrl+V away), minimise our window so GNOME refocuses the previous window, wait 0.4 s, paste. On failure the window returns with "press Ctrl+V". With only Qt's clipboard available, it doesn't attempt the paste.
+- UI: Copy button → **Insert** (Ctrl+Enter); **Edit → Copy command only** (Ctrl+Shift+C). Both go through the destructive-confirmation gate.
+- Verified: a dry run against the real portal (no dialog, no keys), then the user's own test: GNOME consent granted once (restore token saved), 4 successful inserts into Claude's prompt box.
+- Fixed after the user's test: a statement with no request ("I am going to put on a project that uses…") came back as the model's own remark "No actionable request detected." The prompt now forbids comments about the transcript, and the compressor rejects any rewrite keeping < 25% of the speaker's content words (good rewrites keep ≥ 50%), falling back to the cleaned transcript so Insert can never paste such a reply. Whisper's prompt now says commands are spoken to Claude ("Hey Cloud" mishearing). Eval: 16/17 (unchanged), new sample `statement-no-request`.
+- Also: `voice2claude shortcut install|uninstall|status` sets Ctrl+Alt+Space in GNOME without touching other custom shortcuts; starting a recording from the shortcut now brings the window forward.
 
 ## v1 status
 

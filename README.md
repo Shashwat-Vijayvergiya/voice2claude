@@ -7,8 +7,8 @@ Speech-to-text and compression both run on one free Groq API key.
 
 **How it works:** press your shortcut → speak → the app transcribes (Groq Whisper), rewrites it into a
 structured prompt (Groq LLM), checks nothing important was lost → you review, edit if needed, press
-**Copy** (Ctrl+Enter) → paste into Claude and press Enter yourself. The app never sends anything to
-Claude and never presses Enter.
+**Insert** (Ctrl+Enter) → it lands in Claude's prompt box → you press Enter yourself. The app never
+presses Enter.
 
 **Privacy:** audio and text go to Groq for processing; no audio is ever written to disk. Avoid dictating secrets.
 
@@ -70,22 +70,28 @@ rewrite it again. **Mode** forces COMMAND / QUESTION / CODE / DICTATION; *Auto* 
 decide. Under 30 words or DICTATION mode, no LLM call is made (only fillers are removed);
 press **Compress** to compress a short command anyway.
 
-## Copying
+## Inserting into Claude
 
-**Copy** (or **Ctrl+Enter**, also inside the text boxes) puts the command, including your edits,
-on the clipboard: `wl-copy` on Wayland, `xclip` on X11, or Qt's clipboard as a last resort (that one
-only lasts while the app is open; the status bar says so). Then paste into Claude and press Enter.
+**Insert** (or **Ctrl+Enter**, also inside the text boxes) puts the command, including your edits,
+straight into the window you were using, normally Claude's prompt box:
 
-Copy is disabled while the command is empty, or while a destructive command isn't confirmed.
-If you edited the command, the edited version is what follow-ups will build on.
+1. the command goes on the clipboard (`wl-copy` / `xclip`),
+2. Voice to Claude minimises, so GNOME returns focus to the window you came from,
+3. Ctrl+V is sent through GNOME's Remote Desktop portal.
 
-To check the compression prompt against real Groq calls (uses your quota, about 16 requests):
+It never presses Enter: review the text in Claude and send it yourself.
 
-```bash
-.venv/bin/python tests/eval_compression.py
-```
+**First time only:** GNOME asks *"Allow remote interaction?"*. Allow it; the answer is remembered
+(token in `~/.local/share/voice-to-claude/portal-restore-token`; delete that file to be asked again).
+While inserting, GNOME may briefly show a remote-control icon in the top bar.
 
-Add your own spoken commands to `tests/samples/commands.json` with the items that must survive.
+If the window behind Voice to Claude isn't Claude, the paste goes there instead. Use
+**Edit → Copy command only** (Ctrl+Shift+C) when you want to paste somewhere yourself. If inserting
+fails for any reason, the window comes back and the command is already on the clipboard: click
+Claude's prompt box and press Ctrl+V.
+
+Insert and Copy are disabled while the command is empty, or while a destructive command isn't
+confirmed. If you edited the command, the edited version is what follow-ups will build on.
 
 ## Projects, notes and follow-ups
 
@@ -179,5 +185,7 @@ Unit tests mock the Groq API and never use your quota.
 | "The microphone stopped sending audio" | The mic was unplugged or taken by another app; check it and press Record. |
 | "Groq's free-tier limit was reached" | Wait a minute. Compression allows roughly 6 calls per minute on the free tier. |
 | Copy fails | `sudo apt install wl-clipboard xclip`; you can always select the text and copy by hand. |
+| Insert pastes in the wrong window | Click in Claude's prompt box before pressing the shortcut, or use Edit → Copy command only. |
+| Insert says permission was declined | Delete `~/.local/share/voice-to-claude/portal-restore-token` and Insert again to get GNOME's dialog back. |
 | Shortcut does nothing | `./voice2claude status`; check the full path in the custom shortcut. |
 | Anything else | `~/.local/share/voice-to-claude/logs/app.log` (no transcripts are logged there). |

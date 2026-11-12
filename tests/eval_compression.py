@@ -68,6 +68,8 @@ def main(argv: list[str]) -> int:
             problems.append(f"destructive={destructive}")
         if s.get("expect_ambiguity") and not out.ambiguities:
             problems.append("expected an ambiguity")
+        if out.fallback_error and "your own wording" in out.fallback_error:
+            problems.append("rewrite rejected (replaced your words)")
         if s.get("expect_skipped") and not out.skipped:
             problems.append("expected skip")
         report = check(s["transcript"], text, out.mode)

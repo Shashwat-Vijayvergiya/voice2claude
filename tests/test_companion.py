@@ -104,3 +104,67 @@ def test_cli_usage_lists_companion(capsys):
 def test_cli_runs_on_system_python():
     out = subprocess.run([str(companion.CLI), "companion", "status"], capture_output=True, text=True, timeout=20)
     assert out.returncode == 0 and out.stdout.startswith("companion:")
+
+
+# ---- shortcut ----------------------------------------------------------------
+
+class FakeGSettings:
+    """In-memory gsettings: keys by (schema, key)."""
+
+    def __init__(self, paths):
+        self.store = {(companion.MEDIA_KEYS, "custom-keybindings"): companion._format_list(paths)}
+        self.store.update({
+            (f"{companion.CUSTOM_SCHEMA}:{companion.CUSTOM_BASE}custom0/", "name"): "'Open Terminal'",
+            (f"{companion.CUSTOM_SCHEMA}:{companion.CUSTOM_BASE}custom0/", "command"): "'ptyxis --new-window'",
+            (f"{companion.CUSTOM_SCHEMA}:{companion.CUSTOM_BASE}custom1/", "name"): "'Open Chrome'",
+            (f"{companion.CUSTOM_SCHEMA}:{companion.CUSTOM_BASE}custom1/", "command"): "'google-chrome --new-window'",
+        })
+
+    def __call__(self, op, schema, key=None, value=None):
+        if op == "get":
+            return SimpleNamespace(returncode=0, stdout=self.store.get((schema, key), "''"), stderr="")
+        if op == "set":
+            self.store[(schema, key)] = value
+        elif op == "reset-recursively":
+            for k in [k for k in self.store if k[0] == schema]:
+                del self.store[k]
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+
+BASE = companion.CUSTOM_BASE
+
+
+def test_shortcut_added_without_touching_others():
+    g = FakeGSettings([f"{BASE}custom0/", f"{BASE}custom1/"])
+    msg = companion.shortcut_install(run=g)
+    assert "Ctrl+Alt+space" in msg
+    paths = companion._parse_list(g.store[(companion.MEDIA_KEYS, "custom-keybindings")])
+    assert paths == [f"{BASE}custom0/", f"{BASE}custom1/", f"{BASE}custom2/"]
+    new = f"{companion.CUSTOM_SCHEMA}:{BASE}custom2/"
+    assert g.store[(new, "command")] == f"{companion.CLI} toggle"
+    assert g.store[(new, "binding")] == "<Control><Alt>space"
+    assert g.store[(f"{companion.CUSTOM_SCHEMA}:{BASE}custom0/", "name")] == "'Open Terminal'"
+
+
+def test_shortcut_install_twice_updates_in_place():
+    g = FakeGSettings([f"{BASE}custom0/", f"{BASE}custom1/"])
+    companion.shortcut_install(run=g)
+    companion.shortcut_install("<Super><Alt>v", run=g)
+    paths = companion._parse_list(g.store[(companion.MEDIA_KEYS, "custom-keybindings")])
+    assert len(paths) == 3
+    assert g.store[(f"{companion.CUSTOM_SCHEMA}:{BASE}custom2/", "binding")] == "<Super><Alt>v"
+
+
+def test_shortcut_fills_gap_and_handles_empty_list():
+    g = FakeGSettings([])
+    g.store[(companion.MEDIA_KEYS, "custom-keybindings")] = "@as []"
+    companion.shortcut_install(run=g)
+    assert companion._parse_list(g.store[(companion.MEDIA_KEYS, "custom-keybindings")]) == [f"{BASE}custom0/"]
+
+
+def test_shortcut_uninstall_keeps_others():
+    g = FakeGSettings([f"{BASE}custom0/", f"{BASE}custom1/"])
+    companion.shortcut_install(run=g)
+    assert "removed" in companion.shortcut_uninstall(run=g)
+    assert companion._parse_list(g.store[(companion.MEDIA_KEYS, "custom-keybindings")]) == [f"{BASE}custom0/", f"{BASE}custom1/"]
+    assert companion.shortcut_status(run=g) == "shortcut: not set"

@@ -13,7 +13,11 @@ LONG = ("so basically I want you to refactor the parse_config function in utils.
         "public API because other modules depend on it and then run pytest to make sure all the tests still pass")
 
 
-def reply(mode="COMMAND", command="TASK: Refactor parse_config in utils.py", ambiguities=(), destructive=False):
+GOOD = ("TASK: Refactor the parse_config function in utils.py\nCONSTRAINTS:\n- Do not change the public API "
+        "(other modules depend on it)\nVALIDATION:\n- Run pytest and make sure all tests still pass")
+
+
+def reply(mode="COMMAND", command=GOOD, ambiguities=(), destructive=False):
     return json.dumps({"mode": mode, "command": command, "ambiguities": list(ambiguities), "destructive": destructive})
 
 
@@ -46,7 +50,7 @@ def test_success():
     c, client, _ = make(reply(ambiguities=["Which tests?"], destructive=True))
     out = c.compress(LONG)
     assert out.mode is Mode.COMMAND
-    assert out.command.startswith("TASK:")
+    assert out.command.startswith("TASK:") and out.fallback_error is None
     assert out.ambiguities == ["Which tests?"]
     assert out.destructive and not out.skipped and out.fallback_error is None
     call = client.calls[0]
@@ -225,3 +229,31 @@ def test_force_does_not_override_forced_dictation():
     c, client, _ = make()
     assert c.compress(LONG, forced_mode=Mode.DICTATION, force=True).skipped
     assert client.calls == []
+
+
+
+# ---- a reply that replaces the speaker's words is rejected -------------------------
+
+STATEMENT = ("Hey Cloud, I am going to put on a project that uses LHCM embedding and dense neural network "
+             "to produce complete music from a single note.")
+
+
+def test_comment_instead_of_rewrite_falls_back_to_transcript():
+    # Real gpt-oss reply seen by the user.
+    c, _, _ = make(reply(mode="QUESTION", command="No actionable request detected."), skip_under_words=0)
+    out = c.compress(STATEMENT)
+    assert out.fallback_error and "your own wording" in out.fallback_error
+    assert "LHCM embedding" in out.command and "No actionable" not in out.command
+
+
+def test_good_rewrite_of_statement_is_kept():
+    rewrite = ("Context: I am starting a project that uses LHCM embedding and a dense neural network "
+               "to produce complete music from a single note.")
+    c, _, _ = make(reply(command=rewrite), skip_under_words=0)
+    out = c.compress(STATEMENT)
+    assert out.fallback_error is None and out.command == rewrite
+
+
+def test_short_text_is_never_judged_by_coverage():
+    c, _, _ = make(reply(command="TASK: Add tests"), skip_under_words=0)
+    assert c.compress("add some tests please").fallback_error is None

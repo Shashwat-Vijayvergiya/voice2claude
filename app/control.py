@@ -176,6 +176,9 @@ USAGE = """usage: voice2claude <command>
   show                 bring the window forward (starts the app if it isn't running)
   status               say whether the app is running
 
+  shortcut install     set Ctrl+Alt+Space to start/stop recording (GNOME)
+  shortcut uninstall   remove that shortcut
+  shortcut status      show the shortcut
   companion install    open Voice to Claude whenever Claude desktop starts
   companion uninstall  stop doing that
   companion status     show whether it's set up
@@ -189,6 +192,15 @@ def main(argv: list[str]) -> int:
 
         try:
             print(getattr(companion, argv[1])())
+        except (RuntimeError, OSError) as exc:
+            sys.stderr.write(f"voice2claude: {exc}\n")
+            return 1
+        return 0
+    if argv[:1] == ["shortcut"] and len(argv) == 2 and argv[1] in ("install", "uninstall", "status"):
+        from app import companion
+
+        try:
+            print(getattr(companion, f"shortcut_{argv[1]}")())
         except (RuntimeError, OSError) as exc:
             sys.stderr.write(f"voice2claude: {exc}\n")
             return 1

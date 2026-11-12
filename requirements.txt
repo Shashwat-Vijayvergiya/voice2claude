@@ -8,3 +8,4 @@ tiktoken>=0.7
 keyring>=25
 pytest>=8
 pytest-qt>=4.4
+jeepney>=0.8

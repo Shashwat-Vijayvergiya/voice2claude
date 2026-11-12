@@ -7,12 +7,15 @@ handles the Project/History menu actions.
 from __future__ import annotations
 
 import logging
+import threading
+import time
 
-from PySide6.QtCore import QObject, QUrl
+from PySide6.QtCore import QObject, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QDialog, QInputDialog, QMessageBox
 
 from app import clipboard, config
+from app.inserter import InsertError
 from app.context import DEFAULT_PROJECT, ContextError, ContextStore
 from app.history import History, make_entry
 from app.models import CommandResult
@@ -21,6 +24,12 @@ log = logging.getLogger(__name__)
 
 
 class Session(QObject):
+    _minimize = Signal()
+    _inserted = Signal()
+    _insert_failed = Signal(str)
+
+    INSERT_FOCUS_DELAY = 0.4  # time for the desktop to hand focus back to Claude
+
     def __init__(self, window, pipeline, context: ContextStore, history: History, project: str):
         super().__init__(window)
         self.window = window
@@ -38,6 +47,12 @@ class Session(QObject):
         window.clear_history_requested.connect(self.clear_history)
         window.open_data_requested.connect(self.open_data_folder)
         window.copy_requested.connect(self.copy)
+        window.insert_requested.connect(self.insert)
+        self.paster = None  # inserter.PortalPaster, set by main
+        self._inserting = False
+        self._minimize.connect(window.showMinimized)
+        self._inserted.connect(self._on_inserted)
+        self._insert_failed.connect(self._on_insert_failed)
         window.theme_requested.connect(self.set_theme)
         self._last: CommandResult | None = None
         self.copy_fn = clipboard.copy  # replaced in tests
@@ -74,15 +89,71 @@ class Session(QObject):
 
     def copy(self, text: str) -> None:
         """Clipboard only: the user pastes into Claude and presses Enter themselves."""
-        try:
-            method = self.copy_fn(text)
-        except clipboard.ClipboardError as exc:
-            log.warning("Copy failed: %s", exc)
-            QMessageBox.warning(self.window, "Copy failed", f"{exc}\n\nYou can still select the text and copy it by hand.")
+        method = self._to_clipboard(text)
+        if method is None:
             return
         note = " (kept only while this app is open)" if method == "qt" else ""
         self.window.statusBar().showMessage(f"Copied{note}. Paste it into Claude and press Enter.", 6000)
+        self._remember_sent(text, method, "copied")
 
+    def insert(self, text: str) -> None:
+        """Paste into the window you came from (Claude's prompt box). Never presses Enter.
+
+        The clipboard is set first, so if inserting fails the text is still one Ctrl+V away.
+        """
+        if self._inserting:
+            return
+        method = self._to_clipboard(text)
+        if method is None:
+            return
+        self._remember_sent(text, method, "inserted")
+        if self.paster is None or method == "qt":
+            # Qt's clipboard dies with focus changes on Wayland; don't risk an empty paste.
+            self._on_insert_failed("automatic insert isn't available here")
+            return
+        self._inserting = True
+        self.window.statusBar().showMessage("Inserting into the previous window…")
+
+        def before_keys():
+            self._minimize.emit()  # GNOME then focuses the window you were using
+            time.sleep(self.INSERT_FOCUS_DELAY)
+
+        def work():
+            try:
+                self.paster.paste(before_keys)
+            except InsertError as exc:
+                self._insert_failed.emit(str(exc))
+            except Exception as exc:
+                log.exception("Insert failed")
+                self._insert_failed.emit(f"unexpected error: {exc}")
+            else:
+                self._inserted.emit()
+
+        threading.Thread(target=work, name="insert", daemon=True).start()
+
+    def _on_inserted(self) -> None:
+        self._inserting = False
+        log.info("Inserted into the previous window")
+        self.window.statusBar().showMessage("Inserted. Review it in Claude and press Enter.", 10000)
+
+    def _on_insert_failed(self, reason: str) -> None:
+        self._inserting = False
+        log.warning("Insert failed: %s", reason)
+        self.window.showNormal()
+        self.window.bring_forward()
+        msg = f"Couldn't insert ({reason}). The command is on the clipboard: click Claude's prompt box and press Ctrl+V."
+        self.window.message_label.setText(msg)
+        self.window.statusBar().showMessage("Insert failed; command copied instead.", 10000)
+
+    def _to_clipboard(self, text: str) -> str | None:
+        try:
+            return self.copy_fn(text)
+        except clipboard.ClipboardError as exc:
+            log.warning("Copy failed: %s", exc)
+            QMessageBox.warning(self.window, "Copy failed", f"{exc}\n\nYou can still select the text and copy it by hand.")
+            return None
+
+    def _remember_sent(self, text: str, method: str, event: str) -> None:
         last = self._last
         if last is None:
             return
@@ -95,7 +166,7 @@ class Session(QObject):
                 log.warning("Could not update recent command: %s", exc)
         try:
             self.history.append({
-                "event": "copied", "project": self.project, "item_id": last.item_id,
+                "event": event, "project": self.project, "item_id": last.item_id,
                 "edited": edited, "command": text if edited else None, "method": method,
             })
         except OSError as exc:

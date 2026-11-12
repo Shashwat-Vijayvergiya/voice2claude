@@ -7,7 +7,7 @@ def test_window_starts_idle(qtbot):
     qtbot.addWidget(w)
     assert w.status is Status.IDLE
     assert w.current_project() == "demo"
-    assert not w.copy_button.isEnabled()
+    assert not w.insert_button.isEnabled()
 
 
 def test_missing_key_shows_error(qtbot):
@@ -136,16 +136,16 @@ def test_low_coverage_warning_shown(qtbot):
 
 # ---- Phase 5: copy gate -----------------------------------------------------
 
-def test_copy_button_follows_gate(qtbot):
+def test_insert_button_follows_gate(qtbot):
     w = MainWindow()
     qtbot.addWidget(w)
-    assert not w.copy_button.isEnabled()  # empty
+    assert not w.insert_button.isEnabled()  # empty
     show(w, "TASK: Refactor parse_config in utils.py")
-    assert w.copy_button.isEnabled()
+    assert w.insert_button.isEnabled()
     show(w, "Delete utils.py", destructive=True)
-    assert not w.copy_button.isEnabled()
+    assert not w.insert_button.isEnabled()
     w.destructive_confirm.setChecked(True)
-    assert w.copy_button.isEnabled()
+    assert w.insert_button.isEnabled()
 
 
 def test_copy_emits_edited_text_and_blocks_unconfirmed(qtbot):
@@ -164,14 +164,14 @@ def test_copy_emits_edited_text_and_blocks_unconfirmed(qtbot):
     assert got == ["Delete utils.py only"]
 
 
-def test_ctrl_enter_copies(qtbot):
+def test_ctrl_enter_inserts(qtbot):
     from PySide6.QtCore import Qt
 
     w = MainWindow()
     qtbot.addWidget(w)
     w.show()
     got = []
-    w.copy_requested.connect(got.append)
+    w.insert_requested.connect(got.append)
     show(w, "TASK: Refactor parse_config in utils.py")
     qtbot.keyClick(w.command_edit, Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
     assert got == ["TASK: Refactor parse_config in utils.py"]
@@ -186,3 +186,31 @@ def test_theme_menu(qtbot):
     assert w.theme_actions["light"].isChecked()
     w.theme_actions["dark"].trigger()
     assert got == ["dark"] and w.theme_actions["dark"].isChecked()
+
+
+def test_insert_button_and_copy_only_menu(qtbot):
+    w = MainWindow()
+    qtbot.addWidget(w)
+    inserted, copied = [], []
+    w.insert_requested.connect(inserted.append)
+    w.copy_requested.connect(copied.append)
+    assert w.insert_button.text() == "Insert"
+    assert not w.copy_action.isEnabled()
+    show(w, "TASK: Refactor parse_config in utils.py")
+    assert w.copy_action.isEnabled()
+    w.insert_button.click()
+    w.copy_action.trigger()
+    assert inserted == copied == ["TASK: Refactor parse_config in utils.py"]
+
+
+def test_insert_blocked_until_destructive_confirmed(qtbot):
+    w = MainWindow()
+    qtbot.addWidget(w)
+    got = []
+    w.insert_requested.connect(got.append)
+    show(w, "Delete utils.py", destructive=True)
+    w.request_insert()
+    assert got == []
+    w.destructive_confirm.setChecked(True)
+    w.request_insert()
+    assert got == ["Delete utils.py"]

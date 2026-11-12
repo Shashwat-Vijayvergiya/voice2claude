@@ -7,6 +7,7 @@ import pytest
 from app.models import Recording
 from app.transcriber import (
     MAX_PROMPT_CHARS,
+    WHISPER_PREFIX,
     Transcriber,
     TranscriptionError,
     build_vocabulary_prompt,
@@ -138,7 +139,8 @@ def test_vocabulary_prompt_is_capped_and_deduped():
     prompt = build_vocabulary_prompt(terms)
     assert len(prompt) <= MAX_PROMPT_CHARS
     assert prompt.count("alpha") == 1
-    assert build_vocabulary_prompt([]) is None
+    assert prompt.startswith("Hey Claude")
+    assert build_vocabulary_prompt([]) == WHISPER_PREFIX.strip()
 
 
 @pytest.mark.parametrize(

@@ -63,7 +63,8 @@ class MainWindow(QMainWindow):
     reset_recent_requested = Signal()
     clear_history_requested = Signal()
     open_data_requested = Signal()
-    copy_requested = Signal(str)  # the command text exactly as shown/edited
+    insert_requested = Signal(str)  # paste into the window you came from (Claude); text as shown/edited
+    copy_requested = Signal(str)  # clipboard only (Edit menu, Ctrl+Shift+C)
     theme_requested = Signal(str)  # system | light | dark
 
     def __init__(self, project: str = "default", api_key_missing_message: str | None = None):
@@ -159,23 +160,24 @@ class MainWindow(QMainWindow):
         self.message_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.retry_button = QPushButton("Retry")
         self.retry_button.setVisible(False)
-        self.copy_button = QPushButton("Copy")
-        self.copy_button.setEnabled(False)
-        self.copy_button.setDefault(True)
-        self.copy_button.setToolTip(
-            "Copy the command to the clipboard (Ctrl+Enter). Paste it into Claude and press Enter yourself."
+        self.insert_button = QPushButton("Insert")
+        self.insert_button.setEnabled(False)
+        self.insert_button.setDefault(True)
+        self.insert_button.setToolTip(
+            "Insert the command into the window you were using, e.g. Claude's prompt box (Ctrl+Enter). "
+            "It is never sent: review it there and press Enter yourself."
         )
-        self.copy_button.clicked.connect(self.request_copy)
-        QShortcut(QKeySequence("Ctrl+Return"), self, activated=self.request_copy)
-        QShortcut(QKeySequence("Ctrl+Enter"), self, activated=self.request_copy)
+        self.insert_button.clicked.connect(self.request_insert)
+        QShortcut(QKeySequence("Ctrl+Return"), self, activated=self.request_insert)
+        QShortcut(QKeySequence("Ctrl+Enter"), self, activated=self.request_insert)
         # Text boxes swallow Ctrl+Enter as a line break before the shortcut sees it.
-        self._copy_keys = _CtrlEnterFilter(self.request_copy, self)
+        self._copy_keys = _CtrlEnterFilter(self.request_insert, self)
         self.command_edit.installEventFilter(self._copy_keys)
         self.original_edit.installEventFilter(self._copy_keys)
         bottom = QHBoxLayout()
         bottom.addWidget(self.message_label, 1)
         bottom.addWidget(self.retry_button)
-        bottom.addWidget(self.copy_button)
+        bottom.addWidget(self.insert_button)
 
         root = QVBoxLayout()
         root.addLayout(top)
@@ -188,6 +190,7 @@ class MainWindow(QMainWindow):
         central.setLayout(root)
         self.setCentralWidget(central)
         self._build_menus()
+        self._update_copy_state()  # Insert and Copy-only start disabled (nothing to send yet)
         self.stats_label = QLabel()
         self.statusBar().addPermanentWidget(self.stats_label)
 
@@ -315,6 +318,10 @@ class MainWindow(QMainWindow):
 
     def _build_menus(self) -> None:
         bar = self.menuBar()
+        edit = bar.addMenu("&Edit")
+        self.copy_action = edit.addAction("&Copy command only", self.request_copy)
+        self.copy_action.setShortcut(QKeySequence("Ctrl+Shift+C"))
+        self.copy_action.setToolTip("Put the command on the clipboard without inserting it anywhere")
         project = bar.addMenu("&Project")
         project.addAction("&New project…", self.new_project_requested.emit)
         project.addAction("&Edit notes…", self.edit_notes_requested.emit)
@@ -338,10 +345,16 @@ class MainWindow(QMainWindow):
         if theme in self.theme_actions:
             self.theme_actions[theme].setChecked(True)
 
+    def request_insert(self) -> None:
+        self._through_gate(self.insert_requested)
+
     def request_copy(self) -> None:
-        """Copy only through the gate: non-empty, and destructive commands confirmed."""
+        self._through_gate(self.copy_requested)
+
+    def _through_gate(self, signal) -> None:
+        """Insert/copy only through the gate: non-empty, and destructive commands confirmed."""
         if self.copy_allowed():
-            self.copy_requested.emit(self.command_edit.toPlainText().strip())
+            signal.emit(self.command_edit.toPlainText().strip())
         elif self._destructive_words or (self._compressed and self._compressed.destructive):
             self.statusBar().showMessage("Tick the destructive-action box first.", 4000)
 
@@ -388,7 +401,9 @@ class MainWindow(QMainWindow):
         self._update_copy_state()
 
     def _update_copy_state(self, *_args) -> None:
-        self.copy_button.setEnabled(self.copy_allowed())
+        allowed = self.copy_allowed()
+        self.insert_button.setEnabled(allowed)
+        self.copy_action.setEnabled(allowed)
 
     def _schedule_recheck(self) -> None:
         if not self._setting_command:

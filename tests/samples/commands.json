@@ -264,6 +264,23 @@
         "pytest"
       ],
       "destructive": false
+    },
+    {
+      "id": "statement-no-request",
+      "transcript": "Hey Cloud, I am going to put on a project that uses LHCM embedding and dense neural network to produce complete music from a single note.",
+      "mode": "COMMAND|QUESTION|DICTATION",
+      "must_keep": [
+        "LHCM",
+        "embedding",
+        "neural network",
+        "music",
+        "single note"
+      ],
+      "must_not": [
+        "No actionable",
+        "no request"
+      ],
+      "destructive": false
     }
   ]
 }

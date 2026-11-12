@@ -182,3 +182,63 @@ def test_theme_saved_and_applied(env, tmp_path):
     window.theme_actions["dark"].trigger()
     assert applied == ["dark"]
     assert json.loads((home / "settings.json").read_text())["theme"] == "dark"
+
+
+
+# ---- Insert into the previous window -----------------------------------------------
+
+from app.inserter import InsertError  # noqa: E402
+
+
+class FakePaster:
+    def __init__(self, error=None):
+        self.error, self.calls = error, 0
+
+    def paste(self, before_keys):
+        self.calls += 1
+        before_keys()
+        if self.error:
+            raise InsertError(self.error)
+
+
+def test_insert_copies_first_minimizes_then_pastes(env, qtbot):
+    session, window, pipeline, store, hist, _ = env
+    order = []
+    session.copy_fn = lambda t: order.append(("copy", t)) or "wl-copy"
+    session.INSERT_FOCUS_DELAY = 0
+    session.paster = FakePaster()
+    window.show()
+    finished(pipeline, command="TASK: Add health endpoint")
+    window.insert_requested.emit("TASK: Add health endpoint")
+    qtbot.waitUntil(lambda: not session._inserting, timeout=3000)
+    assert order == [("copy", "TASK: Add health endpoint")] and session.paster.calls == 1
+    assert "Inserted" in window.statusBar().currentMessage()
+    assert hist.entries()[-1]["event"] == "inserted"
+
+
+def test_insert_failure_restores_window_and_says_ctrl_v(env, qtbot):
+    session, window, pipeline, *_ = env
+    session.copy_fn = lambda t: "wl-copy"
+    session.INSERT_FOCUS_DELAY = 0
+    session.paster = FakePaster(error="Permission to type into other windows was declined.")
+    window.insert_requested.emit("x")
+    qtbot.waitUntil(lambda: not session._inserting, timeout=3000)
+    assert "declined" in window.message_label.text() and "Ctrl+V" in window.message_label.text()
+    assert not window.isMinimized()
+
+
+def test_insert_without_real_clipboard_does_not_paste(env):
+    session, window, *_ = env
+    session.copy_fn = lambda t: "qt"  # Qt clipboard may not survive the focus change
+    session.paster = FakePaster()
+    window.insert_requested.emit("x")
+    assert session.paster.calls == 0 and "Ctrl+V" in window.message_label.text()
+
+
+def test_insert_ignored_while_one_is_running(env):
+    session, window, *_ = env
+    session.copy_fn = lambda t: "wl-copy"
+    session.paster = FakePaster()
+    session._inserting = True
+    window.insert_requested.emit("x")
+    assert session.paster.calls == 0

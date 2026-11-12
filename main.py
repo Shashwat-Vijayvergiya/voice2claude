@@ -62,7 +62,7 @@ def main() -> int:
     from app.recorder import Recorder
     from app.transcriber import Transcriber, make_groq_client
     from app.session import Session
-    from app.ui import MainWindow
+    from app.ui import MainWindow, Status
 
     api_key = config.get_api_key()
     missing = None
@@ -111,6 +111,9 @@ def main() -> int:
     context.ensure()
     history = History(data / "history.jsonl", enabled=settings.history_enabled)
     session = Session(window, pipeline, context, history, settings.current_project)
+    from app.inserter import PortalPaster
+
+    session.paster = PortalPaster(data / "portal-restore-token")
 
     from app.theme import apply_theme, follow_system
 
@@ -133,6 +136,8 @@ def main() -> int:
     def on_command(cmd: str) -> None:
         if cmd == "toggle":
             pipeline.toggle()
+            if pipeline.status is Status.LISTENING:
+                window.bring_forward()  # show what's happening when recording starts from the shortcut
         elif cmd == "show":
             window.bring_forward()
 
@@ -145,8 +150,6 @@ def main() -> int:
 
     app.aboutToQuit.connect(pipeline.shutdown)
     app.aboutToQuit.connect(server.stop)
-
-    from app.ui import Status
 
     def on_unhandled(exc_type, exc, tb):
         # Log it and show it instead of only printing to a terminal nobody sees.

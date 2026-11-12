@@ -17,12 +17,15 @@ from pydantic import ValidationError
 
 from app import prompts
 from app.api_errors import classify
-from app.checker import clean_fillers
+from app.checker import clean_fillers, coverage
 from app.models import Compressed, CompressionContext, LLMOutput, Mode
 
 log = logging.getLogger(__name__)
 
 MAX_COMPLETION_TOKENS = 2048
+# Below this share of the speaker's content words, a rewrite is treated as a replacement.
+# Good rewrites in the eval kept 0.5-1.0; replacements kept 0.0-0.22.
+REPLACED_BELOW = 0.25
 
 
 def word_count(text: str) -> int:
@@ -104,6 +107,17 @@ class Compressor:
 
         mode = forced_mode or out.mode
         command = cleaned if mode is Mode.DICTATION else out.command.strip()
+        kept = coverage(transcript, command)
+        if mode is not Mode.DICTATION and kept is not None and kept < REPLACED_BELOW:
+            # The model replaced the request (answered it, commented on it) instead of
+            # rewriting it. Never hand that to Insert: fall back to the speaker's words.
+            log.warning("Rewrite kept %.0f%% of the wording; using the transcript instead", kept * 100)
+            return Compressed(
+                command=cleaned,
+                fallback_error="the rewrite didn't keep your words, so your own wording is shown",
+                latency_s=round(time.monotonic() - started, 2),
+                **base,
+            )
         return Compressed(
             original=transcript,
             command=command,
